@@ -1,0 +1,429 @@
+/* nav{
+    position: fixed;
+    top: 0;
+    left: 0;
+} */
+/*--Part 2--*/
+.hero{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    /* background-color: aqua; */
+    background: linear-gradient(to right bottom, rgb(133, 132, 132),transparent);
+}
+.hero-text{
+    flex: 2;
+    margin-left: 30px;
+}
+.hero-text h1{
+    color: blue;
+    line-height: 60px;
+}
+.hero-text h5{
+    line-height: 60px;
+}
+.hero-text h6{
+    line-height: 60px;
+}
+.btn1{
+    background-color: rgb(57, 196, 57);
+    color: white;
+    font-weight: bold;
+    width: 150px;
+    height: 35px;
+    border-radius: 50px;
+    border: transparent;
+}
+.btn1 a{
+    color: white;
+    text-decoration: none;
+}
+.btn1:hover{
+    background-color: rgb(12, 238, 170);
+}
+.btn2{
+    font-weight: bold;
+    width: 200px;
+    height: 35px;
+    background-color: transparent;
+    color: white;
+    border: transparent;
+}
+.btn2 a{
+    color: white;
+    text-decoration: none;
+}
+.btn2 a:hover{
+    /* color: rgb(12, 238, 170); */
+    color: rgb(46, 105, 46);
+}
+.hero-img{
+    flex:1;
+    margin-left: 80px;
+    overflow: hidden;
+}
+.hero-img-s{
+    height: 350px;
+    width: 300px;
+}
+.hero-text p{
+    font-size: 13px;
+    color: blue;
+    line-height: 30px;
+}
+
+/*--Part 3--*/
+.part-3{
+    margin-top: 60px;
+}
+.part-3 h2{
+    color: blue;
+}
+.part-3 p{
+    font-size: 20px;
+    color: black;
+    font-weight: 600;
+}
+.part-3 img{
+    width: 130px;
+    height: 40px;
+    margin-left: 50px;
+    margin-top: 30px;
+}
+
+/*--Part 4--*/
+.part-4{
+    margin-top: 80px;
+}
+.part-4 h2{
+    color: rgb(12, 238, 170);
+    margin-bottom: 30px;
+}
+.part-4 span{
+    color: rgb(16, 16, 238);
+}
+.box-container{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+.box{
+    border: 1px solid black;
+    height: 350px;
+    width: 30%;
+    border-radius: 5px;
+}
+.box-img{
+    width: 277px;
+    height: 150px;
+    border-radius: 5px;
+    display: block;
+    transition: 0.5s ease;
+}
+.box-img:hover{
+    transform: scale(1.05);
+}
+.box-content h5{
+    margin-top: 15px;
+}
+.box-content p{
+    margin-top: 10px;
+}
+.box-content .btn3{
+    border: none;
+    background: transparent;
+    color: rgb(224, 46, 135);
+    font-weight: 500;
+}
+.box-content .btn3:hover{
+    color: blue;
+}
+
+/*--Part 5--*/
+.university{
+    margin-top: 70px;
+}
+.university h2{
+    color: blue;
+}
+.university p{
+    font-size: 20px;
+    color: black;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+.university img{
+    width: 50px;
+    height: 50px;
+}
+.university span{
+    color: black;
+    font-size: 20px;
+    font-weight: 600;
+    margin-left: 10px;
+    margin-right: 50px;
+}
+
+/*--Part 6--*/
+.hiring{
+    margin-top: 70px;
+}
+.hiring h2{
+    color: rgb(12, 238, 170);
+    margin-bottom: 30px;
+}
+.hiring span{
+    color: blue;
+}
+.hiring-area{
+    display: flex;
+    flex-wrap: wrap;
+}
+.hiring-img{
+    flex: 1;
+    margin-right: 30px;
+}
+.hiring-text{
+    flex: 2;
+    margin-top: 50px;
+}
+.hiring-text p{
+    font-size: 15px;
+    text-align: center;
+    justify-content: center;
+    line-height: 25px;
+}
+.hiring-text p i{
+    color: rgb(12, 238, 170);
+}
+.hiring button{
+    width: 150px;
+    height: 40px;
+    margin-top: 20px;
+    border-radius: 50px;
+    background-color: rgb(85, 85, 233);
+    color: white;
+    font-weight: 500;
+    border: transparent;
+}
+.hiring button:hover{
+    background-color: rgb(38, 247, 177);
+}
+
+/*--Part 7--*/
+.e-book{
+    height: 300px;
+    margin-top: 70px;
+    display: flex;
+    flex-wrap: wrap;
+    background-color: rgb(53, 53, 153);
+}
+.e-book-text{
+    flex: 1;
+    margin-top: 50px;
+    margin-left: 100px;
+}
+.e-book-text h4{
+    font-size: 30px;
+    color: white;
+    /* line-height: 40px; */
+    margin-bottom: 40px;
+}
+.e-book-text p{
+    color: white;
+    /* line-height: 40px; */
+    margin-bottom: 30px;
+}
+.e-book-text button{
+    width: 230px;
+    height: 40px;
+    border-radius: 20px;
+    background-color: rgb(2, 253, 169);
+    border: transparent;
+}
+.e-book-text button:hover{
+    background-color: rgb(7, 129, 89);
+}
+.e-book-img img{
+    flex: 1;
+    width: 320px;
+    height: 360px;
+    rotate: 12deg;
+    margin-top: -65px;
+    margin-right: 50px;
+}
+
+/*--Part 8--*/
+.link{
+    margin-top: 70px;
+}
+.link h3{
+    font-size: 20px;
+    color: blue;
+}
+.link a{
+    text-decoration: underline;
+    color: pink;
+}
+
+/*--Part 9--*/
+.msg{
+    margin-top: 70px;
+    /* display: inline; */
+}
+.msg h3{
+    color: blue;
+}
+.msg span{
+    color: rgb(12, 238, 170); 
+}
+.raiting{
+    float: right;
+}
+.raiting i{
+    color:orangered;
+}
+.boxes-container{
+    margin-top: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+.boxes{
+    border: 1px solid black;
+    height: 360px;
+    width: 32%;
+    border-radius: 5px;
+    margin: 5px;
+}
+.boxes-content h5{
+    color: blue;
+}
+.boxes-content .b-i{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+.boxes-content .imgs{
+    flex: 1;
+    width: 60px;
+    height: 80px;
+    border-radius: 50%;
+    margin-left: 9px;
+}
+.boxes-content .ims{
+    flex: 2;
+    margin-top: 10px;
+    justify-content: center;
+    font-weight: 600;
+}
+.boxes-content .imgs1{
+    width: 160px;
+    height: 30px;
+}
+
+/*--Part 10--*/
+.part-10{
+    margin-top: 70px;
+}
+.part-10 h2{
+    margin-bottom: 40px;
+    color: rgb(12, 238, 170);
+}
+.part-10 span{
+    color: blue;
+}
+.boxs-container{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+.boxs-content a{
+    font-size: 20px;
+    font-weight: 500;
+    color: black;
+}
+.boxs-content .time{
+    font-size: 15px;
+    /* font-weight: 500; */
+    color: black;
+}
+.boxs{
+    border: 1px solid black;
+    height: 350px;
+    width: 30%;
+    border-radius: 5px;
+}
+.boxs-img{
+    width: 275px;
+    height: 150px;
+    border-radius: 5px;
+    display: block;
+    transition: 0.5s ease;
+}
+.boxs-img:hover{
+    transform: scale(1.05);
+}
+
+/*-- Part 11 --*/
+.foot-panel1{
+    margin-top: 70px;
+    height: 300px;
+    /* background-color: rgb(3, 102, 214); */
+    background-image: url(../Img/bg.jpg);
+    background-size: cover;
+    display: flex;
+    justify-content: space-evenly;
+    padding: 30px;
+}
+.foot-panel1 .ima{
+    width: 120px;
+    height: 40px;
+    margin-bottom: 10px;
+}
+.foot-panel1 h4{
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+.foot-panel1 h6{
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+.foot-panel1 .imb{
+    width: 100px;
+    height: 80px;
+}
+.foot-panel1 .imc{
+    width: 100px;
+    height: 80px;
+}
+.foot-panel1 .imd{
+    width: 130px;
+    height: 70px;
+}
+.foot-panel1 ul{
+    /* margin-bottom: 20px; */
+    /* line-height: 20px; */
+    color: black;
+}
+.foot-panel1 ul p{
+    font-size: 20px;
+    font-weight: bold;
+    color: red;
+}
+.foot-panel1 a{
+    display: block;
+    color: black;
+    margin-bottom: 10px;
+    text-decoration: none;
+    font-weight: 600;
+}
+.foot-panel1 a:hover{
+    /* color: brown; */
+    color: blue;
+}
+.foot-panel1 i{
+    margin-right: 10px;
+    font-size: 20px;
+}

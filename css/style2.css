@@ -1,0 +1,105 @@
+/*---Part-2---*/
+.test{
+    margin-top: 40px;
+}
+.test h2{
+    font-size: 35px;
+}
+.test p{
+    color: #424242;
+}
+
+.box{
+    margin-top: 30px;
+    /* width: 480px;
+    height: 220px; */
+    width: 900px;
+    height: 220px;
+    border: 2px solid black;
+    background-color: rgb(214, 214, 214);
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    /* justify-content:space-evenly; */
+}
+.box-img{
+    flex: 1;
+    width: 500px;
+    height: 200px;
+}
+.box-text{
+    flex: 2;
+    margin-left: 15px;
+    margin-top: 9px;
+}
+.box-text h5{
+    font-size: 22px;
+}
+.box-text button{
+    border: none;
+    background: transparent;
+    color: blue;
+}
+.box-text button:hover{
+    color: red;
+}
+.btn{
+    margin-top: 30px;
+    /* text-align: center;
+    justify-content: center; */
+    margin-left: 400px;
+    color: blue;
+}
+.btn:hover{
+    color: brown;
+}
+
+/*---Part3---*/
+.recruiter{
+    height: 280px;
+    background-color: rgb(45, 45, 253);
+    text-align: center;
+    justify-content: center;
+    margin-top: 50px;
+    padding-top: 50px;
+    line-height: 40px;
+    margin-bottom: 50px;
+}
+.recruiter h3{
+    font-weight: bold;
+}
+.recruiter .btn1{
+    width: 190px;
+    height: 50px;
+    border-radius: 25px;
+    border: none;
+    background-color: rgb(17, 236, 163);
+    color: blue;
+    font-weight: bold;
+}
+.recruiter .btn2{
+    width: 190px;
+    height: 50px;
+    border-radius: 25px;
+    border: 2px solid rgb(17, 236, 163) ;
+    /* border-color: rgb(17, 236, 163); */
+    background-color: transparent;
+    color: rgb(17, 236, 163);
+    font-weight: bold;
+}
+.recruiter .btn1:hover, .btn2:hover{
+    background-color: yellow;
+}
+.recruiter p .p1{
+    font-size: 9px;
+    margin-left: 30px;
+}
+
+/*---Part 4---*/
+.worried p{
+    color: blue;
+    font-size: 19px;
+}
+.worried a{
+    text-decoration: underline;
+}
