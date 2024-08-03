@@ -1,0 +1,1539 @@
+// Custom Swal Mixin to be used for all modal popups
+let eqpSwal;
+if (!noSwal) {
+    eqpSwal = Swal.mixin({
+        focusConfirm: false,
+        focusCancel: false,
+        focusDeny: false,
+        customClass: {
+            icon: "mt-5 mb-0 !border-none",
+            title: "text-base font-semibold leading-6 text-gray-900 mx-0 px-5",
+            htmlContainer: "!text-sm text-gray-500 mx-0 px-5",
+            closeButton: "!shadow-none !focus:outline-none",
+            confirmButton: "pri-btn !text-sm w-full m-0", // TODO: remove `!` important, once we have a proper fix for the issue
+            cancelButton: "sec-btn !bg-gray-100 !text-black !text-sm w-full m-0",
+            denyButton: "sec-btn hover:bg-red-800 !text-sm w-full m-0",
+            actions: "px-5 w-full flex-nowrap gap-x-2",
+        },
+    });
+}
+
+function convertISOStringToLocalDateTime(isoDateString, include_seconds = false, date_only = false) {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let dateTime;
+
+    try {
+        const str2 = isoDateString.replace(" ", "T");
+        dateTime = new Date(str2);
+    } catch (e) {
+        return isoDateString;
+    }
+
+    const date = dateTime.getDate();
+    const month = monthNames[dateTime.getMonth()];
+    let hours = dateTime.getHours();
+
+    let ampm;
+    ampm = hours >= 12 ? "PM" : "AM";
+
+    if (hours > 12) {
+        hours = hours - 12;
+    }
+
+    let minutes = dateTime.getMinutes();
+    if (minutes < 10) {
+        minutes = "0" + minutes;
+    }
+
+    let formattedDate;
+    if (include_seconds) {
+        let seconds = dateTime.getSeconds();
+        if (seconds < 10) {
+            seconds = "0" + seconds;
+        }
+        formattedDate = date + "-" + month + "  " + hours + ":" + minutes + ":" + seconds + " " + ampm;
+    } else if (date_only) {
+        const year = dateTime.getFullYear();
+        formattedDate = date + " " + month + " " + year;
+    } else {
+        formattedDate = date + "-" + month + "  " + hours + ":" + minutes + " " + ampm;
+    }
+
+    return formattedDate;
+}
+
+function makePostRequestWithCallback(endpoint, payload, callbackOptions) {
+
+    // callbackOptions can contain the following keys: 'onSuccess', 'onError', 'successMsg', 'errorMsg'
+    // onSuccess = enum('toast', 'swal', 'reload', 'redirect', 'callFunction', 'toastAfterReload', 'reloadAfterSwal')
+    // onError = enum('toast', 'swal', 'reload', 'redirect', 'callFunction')
+
+    function handleErrorResponseCallback(response, callbackOptions) {
+        if (!callbackOptions['onError']) {
+            const errorMsg = "An error occured on the server or while connecting to the server";
+            eqpSwal.fire({
+                html: errorMsg,
+                iconHtml: statusIcon("error"),
+            });
+            throw new Error(errorMsg);
+        } else {
+            let errorMsg;
+            if (["toast", "swal"].includes(callbackOptions['onError'])) {
+                errorMsg = response.error_msg || callbackOptions['errorMsg'] || "An error occured";
+            }
+            if (callbackOptions['onError'] === "toast") {
+                eqpToast(errorMsg, "error");
+            } else if (callbackOptions['onError'] === "swal") {
+                eqpSwal.fire({
+                    html: errorMsg,
+                    iconHtml: statusIcon("error"),
+                });
+            }
+        }
+    }
+
+    function handleSuccessResponseCallback(data, callbackOptions) {
+        // if onSuccess is one of toast, swal, toastAfterReload, reloadAfterSwal
+        let successMsg, successTitle;
+        if (["toast", "swal", "toastAfterReload", "reloadAfterSwal"].includes(callbackOptions['onSuccess'])) {
+            successMsg = data.success_msg || callbackOptions['successMsg'] || "Success";
+            successTitle = data.success_title || callbackOptions['successTitle'] || "";
+        }
+
+        if (callbackOptions['onSuccess'] === "toast") {
+            eqpToast(successMsg, "success");
+        } else if (callbackOptions['onSuccess'] === "swal") {
+            eqpSwal.fire({
+                html: successMsg,
+                title: successTitle,
+                iconHtml: statusIcon("success"),
+            });
+        } else if (callbackOptions['onSuccess'] === "reloadAfterSwal") {
+            eqpSwal.fire({
+                html: successMsg,
+                title: successTitle,
+                iconHtml: statusIcon("success"),
+            })
+                .then(() => {window.location.reload();});
+        } else if (callbackOptions['onSuccess'] === "reload") {
+            window.location.reload();
+        } else if (callbackOptions['onSuccess'] === "redirect") {
+            const redirectUrl = callbackOptions['successRedirectUrl'] || data.redirect_url;
+            if (redirectUrl) {
+                window.location.href = redirectUrl;
+            }
+        } else {
+            callbackOptions['onSuccess'](data.success_response_args);
+        }
+    }
+
+    if (!endpoint) {
+        endpoint = window.location.href;
+    }
+
+    const fetchOptions = {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrf_token,
+        },
+        body: JSON.stringify(payload),
+    };
+
+    fetch(endpoint, fetchOptions)
+        .then(response => {
+            //non-20* response
+            if (!response.ok) {
+                handleErrorResponseCallback(response, callbackOptions);
+            }
+
+            // Check if the response is JSON
+            const contentType = response.headers.get('Content-Type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                throw new Error('Non-JSON response received');
+            }
+        })
+        .then(data => {
+            if (data.status === 'error') {
+                handleErrorResponseCallback(data, callbackOptions);
+            } else {
+                if (callbackOptions && callbackOptions['onSuccess']) {
+                    handleSuccessResponseCallback(data, callbackOptions);
+                }
+            }
+        })
+        .catch((error) => {
+            // No internet connection or CORS error
+            if (error instanceof TypeError && error.message === "Failed to fetch") {
+                eqpSwal.fire({
+                    html: "Please check your internet connection and try again.",
+                    iconHtml: statusIcon("error"),
+                });
+                // Error thrown earlier of non-20* response or non-JSON response
+            } else if (error.message === "No JSON response from the server") {
+                console.error("No JSON response from the server");
+            } else {
+                console.error("Error:", error);
+            }
+        })
+        .finally(() => {
+            if (callbackOptions && callbackOptions['finally']) {
+                callbackOptions['finally']();
+            }
+        })
+}
+
+
+function makePostRequest(url, dataDict, callbackOptions, ajaxOptions) {
+    let ajaxParams = {
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(dataDict),
+    };
+    if (ajaxOptions) {
+        $.extend(ajaxParams, ajaxOptions);
+    }
+    if (url) {
+        ajaxParams["url"] = url;
+    }
+
+    if (!callbackOptions) {
+        $.ajax(ajaxParams);
+        return null;
+    }
+
+    const {
+        successCallback,
+        errorCallback,
+        failCallback,
+        successArg,
+        errorArg,
+        failArg,
+        successRedirect,
+        alwaysCallback,
+        alwaysArg,
+        notificationType,
+    } = callbackOptions;
+
+    $.ajax(ajaxParams)
+        .done(function (response) {
+            if (response.status === "success") {
+                if (notificationType === "toast") {
+                    showToast("success", response.success_title);
+                } else if (successCallback === "reload") {
+                    if (response.success_msg !== null) {
+                        eqpSwal
+                            .fire({
+                                html: response.success_msg,
+                                title: response?.success_title ?? "",
+                                iconHtml: statusIcon("success"),
+                                width: 400
+                            })
+                            .then(() => {
+                                location.reload();
+                            });
+                    } else {
+                        location.reload();
+                    }
+                } else if (successRedirect) {
+                    if (response.success_msg) {
+                        eqpSwal
+                            .fire({
+                                html: response.success_msg,
+                                title: response?.success_title ?? "",
+                                iconHtml: statusIcon("success"),
+                                width: 400
+                            })
+                            .then(() => {
+                                window.location = successRedirect;
+                            });
+                    } else {
+                        window.location = successRedirect;
+                    }
+                } else if (successCallback) {
+                    const successResponseArgs = response.success_response_args;
+                    let allArgs = null;
+                    if (successResponseArgs && successArg) {
+                        allArgs = Object.assign({}, successResponseArgs, successArg);
+                    } else if (successResponseArgs) {
+                        allArgs = successResponseArgs;
+                    } else if (successArg) {
+                        allArgs = successArg;
+                    }
+                    if (typeof response.success_msg !== "undefined" && response.success_msg !== null) {
+                        eqpSwal
+                            .fire({
+                                html: response.success_msg,
+                                title: response?.success_title ?? "",
+                                iconHtml: statusIcon("success"),
+                                width: 400
+                            })
+                            .then(() => {
+                                if (allArgs) {
+                                    successCallback(allArgs);
+                                } else {
+                                    successCallback();
+                                }
+                            });
+                    } else {
+                        if (allArgs) {
+                            successCallback(allArgs);
+                        } else {
+                            successCallback();
+                        }
+                    }
+                } else {
+                    if (response?.success_msg) {
+                        eqpSwal
+                            .fire({
+                                html: response.success_msg,
+                                title: response?.success_title ?? "",
+                                iconHtml: statusIcon("success"),
+                                width: 400
+                            })
+                            .then(() => {
+                                if (alwaysCallback && alwaysArg) {
+                                    alwaysCallback(alwaysArg);
+                                } else if (alwaysCallback) {
+                                    alwaysCallback();
+                                }
+                            });
+                    }
+                }
+            } else if (response.status === "error") {
+                if (response.error_msg !== null) {
+                    eqpSwal
+                        .fire({
+                            html: response.error_msg,
+                            iconHtml: statusIcon("error"),
+                            width: 400
+                        })
+                        .then(() => {
+                            if (alwaysCallback && alwaysArg) {
+                                alwaysCallback(alwaysArg);
+                            } else if (alwaysCallback) {
+                                alwaysCallback();
+                            }
+                        });
+                } else {
+                    eqpSwal
+                        .fire({
+                            html: "Some error",
+                            iconHtml: statusIcon("error"),
+                            width: 400
+                        })
+                        .then(() => {
+                            if (alwaysCallback && alwaysArg) {
+                                alwaysCallback(alwaysArg);
+                            } else if (alwaysCallback) {
+                                alwaysCallback();
+                            }
+                        });
+                }
+            }
+        })
+        .fail(function () {
+            eqpSwal
+                .fire({
+                    html: "Some error, either on the server or while connecting to the server",
+                    iconHtml: statusIcon("error"),
+                    width: 400
+                })
+                .then(() => {
+                    if (alwaysCallback && alwaysArg) {
+                        alwaysCallback(alwaysArg);
+                    } else if (alwaysCallback) {
+                        alwaysCallback();
+                    }
+                });
+        })
+        .always((response) => {
+            if (!successCallback && !successArg) {
+                if (alwaysCallback && alwaysArg) {
+                    alwaysCallback(alwaysArg);
+                } else if (alwaysCallback) {
+                    alwaysCallback();
+                }
+            }
+        });
+}
+
+function getParamsVal(queryParam) {
+    const urlParams = new URLSearchParams(location.search);
+    let queryParamValue = null;
+    for (const [key, value] of urlParams) {
+        if (queryParam === key) {
+            queryParamValue = value;
+            break;
+        }
+    }
+    return queryParamValue;
+}
+
+function getParamsDict() {
+    const urlParams = new URLSearchParams(location.search);
+    let queryParamValue = {};
+    for (const [key, value] of urlParams) {
+        queryParamValue[key] = value;
+    }
+    return queryParamValue;
+}
+
+function checkPrevSavedDataAndShowMsg(type) {
+    let anyDataSavedPreviously = localStorage.getItem("reckonDataSaved");
+    if (anyDataSavedPreviously) {
+        let { type, additionalText } = JSON.parse(window.localStorage.getItem("reckonDataSaved"));
+
+        showToast("success", `${type} has been added successfully.${additionalText ? additionalText : ""}`);
+
+        localStorage.removeItem("reckonDataSaved");
+        return true;
+    }
+    let anyDataUpdatedPreviously = localStorage.getItem("reckonDataUpdated");
+    if (anyDataUpdatedPreviously) {
+        let { type, additionalText } = JSON.parse(window.localStorage.getItem("reckonDataUpdated"));
+
+        showToast("success", `${type} has been updated successfully.${additionalText ? additionalText : ""}`);
+
+        localStorage.removeItem("reckonDataUpdated");
+        return true;
+    }
+    let anyDataDeletedPreviously = localStorage.getItem("reckonDataDeleted");
+    if (anyDataDeletedPreviously) {
+        let { type, additionalText } = JSON.parse(window.localStorage.getItem("reckonDataDeleted"));
+
+        showToast("success", `${type} has been deleted successfully.${additionalText ? additionalText : ""}`);
+
+        localStorage.removeItem("reckonDataDeleted");
+        return true;
+    }
+
+    let anySuccessMsg = sessionStorage.getItem("equipSuccessMsg");
+    if (anySuccessMsg) {
+        showToast("success", anySuccessMsg);
+
+        sessionStorage.removeItem("equipSuccessMsg");
+        return true;
+    }
+
+    let anyQuickCreateAsmtSuccessMsg = sessionStorage.getItem("equipQuickCreateSuccessMsg");
+    if (anyQuickCreateAsmtSuccessMsg) {
+        showToast("success", anyQuickCreateAsmtSuccessMsg, 10);
+        sessionStorage.removeItem("equipQuickCreateSuccessMsg");
+        return true;
+    }
+
+    return false;
+}
+
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function getRandomString(length) {
+    var randomChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    var result = "";
+    for (var i = 0; i < length; i++) {
+        result += randomChars.charAt(Math.floor(Math.random() * randomChars.length));
+    }
+    return result;
+}
+
+function getDateTimeFromInput(dateInpElement, setDefault = true) {
+    const selectedDateTime = $(dateInpElement).val();
+    const selectedTime = "12:00 AM";
+    const dateObject = new Date(selectedDateTime + " " + selectedTime);
+    const isoDateTime = dateObject.toISOString().slice(0, -5) + "Z";
+    return isoDateTime;
+}
+
+function showLoginPopup() {
+    eqpSwal.fire({
+        title: "",
+        iconHtml: statusIcon("info"),
+        html:
+            "You need to be logged in to create your own Test. " +
+            '<a href="/account/register" target="_blank">Click here </a> ' +
+            "to register as a recruiter",
+        showCloseButton: true,
+        showCancelButton: false,
+        focusConfirm: false,
+        confirmButtonText: "Ok",
+    });
+}
+
+function showSuccessMsgAndRefresh(type = "update", msgtype = "Status") {
+    let localstorageKey = "reckonDataUpdated";
+    if (type === "delete") {
+        localstorageKey = "reckonDataDeleted";
+    }
+
+    localStorage.setItem(
+        localstorageKey,
+        JSON.stringify({
+            type: msgtype,
+        })
+    );
+    location.reload();
+}
+
+function redirectToLink(link, newTab = "") {
+    if (newTab) {
+        window.open(link, "_blank").focus();
+    } else {
+        location.href = link;
+    }
+}
+
+function copyLink(link, message = "") {
+    if (typeof navigator.clipboard === "undefined") {
+        let textArea = document.createElement("textarea");
+        textArea.value =
+            link.indexOf("http") >= 0 ? link : `${window.location.protocol}//${window.location.host}${link}`;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand("copy");
+            showToast("success", "Link copied successfully");
+        } catch (err) {
+            document.body.removeChild(textArea);
+        }
+    } else {
+        let url = link.indexOf("http") >= 0 ? link : `${window.location.protocol}//${window.location.host}${link}`;
+        navigator.clipboard.writeText(url).then(() => {
+            showToast("success", "Link copied successfully");
+        });
+    }
+}
+
+function sortFunction(a, b, dataAttr, orderBy = "desc", isDateType = false) {
+    
+    if (!noJquery) {
+        const aVal = isDateType
+           ? $(a).attr(dataAttr) !== "None"
+               ? new Date($(a).attr(dataAttr)).getTime()
+               : Date.now()
+           : parseInt($(a).attr(dataAttr));
+        const bVal = isDateType
+           ? $(b).attr(dataAttr) !== "None"
+               ? new Date($(b).attr(dataAttr)).getTime()
+               : Date.now()
+           : parseInt($(b).attr(dataAttr));
+
+        return orderBy === "desc" ? aVal - bVal : bVal - aVal;
+    }
+    else{
+        const aVal = isDateType 
+            ? a.getAttribute(dataAttr) !== "None"
+                ? new Date(a.getAttribute(dataAttr)).getTime()
+                : Date.now()
+            : parseInt(a.getAttribute(dataAttr));
+
+        const bVal = isDateType
+            ? b.getAttribute(dataAttr) !== "None"
+                ? new Date(b.getAttribute(dataAttr)).getTime()
+                : Date.now()
+            : parseInt(b.getAttribute(dataAttr));
+
+        return orderBy === "desc" ? aVal - bVal : bVal - aVal;
+    }
+}
+
+function toggleSwitch(ele) {
+    if ($(ele).hasClass("pri-col__bg")) {
+        $(ele).removeClass("pri-col__bg");
+        $(ele).addClass("bg-gray-200");
+        $(ele).find("span").removeClass("translate-x-5");
+        $(ele).find("span").addClass("translate-x-0");
+    } else {
+        $(ele).addClass("pri-col__bg");
+        $(ele).removeClass("bg-gray-200");
+        $(ele).find("span").removeClass("translate-x-0");
+        $(ele).find("span").addClass("translate-x-5");
+    }
+}
+
+function changeTab(selectedTab, otherTabs) {
+
+    if (!noJquery) {
+        selectedTab.removeClass("border-transparent text-gray-500 whitespace-nowrap");
+        selectedTab.addClass(
+           "border-b-2 border-blue-900 text-blue-900 hover:text-blue-700 hover:border-blue-300 whitespace-nowrap"
+        );
+        otherTabs.forEach((elem) => {
+           elem.removeClass(
+               "border-b-2 border-blue-900 text-blue-900 hover:text-blue-700 hover:border-blue-300 whitespace-nowrap"
+           );
+           elem.addClass("border-transparent text-gray-500 whitespace-nowrap");
+        });
+    }
+    else {
+        if (selectedTab) {
+            selectedTab.classList.remove("border-transparent", "text-gray-500", "whitespace-nowrap");
+            
+            selectedTab.classList.add(
+                "border-b-2","border-blue-900","text-blue-900","hover:text-blue-700","hover:border-blue-300","whitespace-nowrap"
+        );
+        }
+    
+        otherTabs.forEach(elem => {
+            if (elem) {
+                elem.classList.remove(
+                    "border-b-2","border-blue-900","text-blue-900","hover:text-blue-700","hover:border-blue-300","whitespace-nowrap"
+                );
+                elem.classList.add("border-transparent", "text-gray-500", "whitespace-nowrap");
+            }
+        });
+    }
+    
+}
+
+function showModalPopup(title, content, id = null, showOkBtn = false, okBtnText = "OK", scaleUp = false) {
+
+    if (!noJquery) {
+        $("#eqp-modal").show();
+        $(".eqp-modal-overlay").removeClass("opacity-0 ease-out duration-200");
+        $(".eqp-modal-overlay").addClass("ease-in duration-300 opacity-100");
+        $(".eqp-modal-main").removeClass("ease-out duration-200 opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95");
+        if (scaleUp) {
+           $(".eqp-modal-main").addClass("ease-in duration-300 opacity-100 translate-y-0 sm:scale-150");
+        } else {
+           $(".eqp-modal-main").addClass("ease-in duration-300 opacity-100 translate-y-0 sm:scale-100");
+        }
+        if (title !== "Excel Test") {
+           $(".eqp-modal-title").html(title);
+        } else {
+           $(".eqp-modal-title").hide();
+        }
+    
+        $(".eqp-modal-content").html(content);
+        if (showOkBtn) {
+           $(".popup-ok-btn").show();
+           $(".popup-ok-btn-text").html(okBtnText);
+        }
+        if (id) {
+           $("#eqp-modal-id").val(id);
+        }    
+    }
+    else {
+        document.getElementById('eqp-modal').style.display = 'block';
+        var modalOverlay = document.querySelector('.eqp-modal-overlay');
+        modalOverlay.classList.remove('opacity-0', 'ease-out', 'duration-200');
+        modalOverlay.classList.add('ease-in', 'duration-300', 'opacity-100');
+        var modalMain = document.querySelector('.eqp-modal-main');
+        modalMain.classList.remove('ease-out', 'duration-200', 'opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+        if (scaleUp) {
+            modalMain.classList.add('ease-in', 'duration-300', 'opacity-100', 'translate-y-0', 'sm:scale-150');
+        } else {
+            modalMain.classList.add('ease-in', 'duration-300', 'opacity-100', 'translate-y-0', 'sm:scale-100');
+        }
+        var modalTitle = document.querySelector('.eqp-modal-title');
+        if (title !== "Excel Test") {
+            modalTitle.innerHTML = title;
+            modalTitle.style.display = 'block';
+        } else {
+            modalTitle.style.display = 'none';
+        }
+    
+        document.querySelector('.eqp-modal-content').innerHTML = content;
+        if (showOkBtn) {
+            document.querySelector('.popup-ok-btn').style.display = 'block';
+            document.querySelector('.popup-ok-btn-text').innerHTML = okBtnText;
+        }
+        if (id) {
+            document.getElementById('eqp-modal-id').value = id;
+        }
+    }
+}
+
+function hideModalPopup() {
+
+    if (!noJquery) {
+        $(".eqp-modal-overlay").addClass("opacity-0 ease-out duration-200");
+        $(".eqp-modal-overlay").removeClass("ease-in duration-300 opacity-100");
+        $(".eqp-modal-main").addClass("ease-out duration-200 opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95");
+        $(".eqp-modal-main").removeClass("ease-in duration-300 opacity-100 translate-y-0 sm:scale-100");
+        $(".eqp-modal-title").html("");
+        $(".eqp-modal-content").html("");
+        $("#eqp-modal").hide();
+    }
+    else {
+        let modalOverlay = document.querySelector('.eqp-modal-overlay');
+        modalOverlay.classList.add('opacity-0', 'ease-out', 'duration-200');
+        modalOverlay.classList.remove('ease-in', 'duration-300', 'opacity-100');
+        let modalMain = document.querySelector('.eqp-modal-main');
+        modalMain.classList.add('ease-out', 'duration-200', 'opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+        modalMain.classList.remove('ease-in', 'duration-300', 'opacity-100', 'translate-y-0', 'sm:scale-100');
+        let modalTitle = document.querySelector('.eqp-modal-title');
+        modalTitle.innerHTML = '';
+        let modalContent = document.querySelector('.eqp-modal-content');
+        modalContent.innerHTML = '';
+        let modal = document.getElementById('eqp-modal');
+        modal.style.display = 'none';
+    }
+}
+
+function showToast(type, message, time = 7) {
+    const tooltipHtml = `
+  <div class="flex items-stretch p-3 bg-white rounded-md max-w-sm shadow-lg tw-tooltip-inner-container" style="display:none;">
+      <div class="flex items-center flex-shrink-0 pl-2 py-2 border-l-4 ${
+        type === "success" ? "border-green-600" : "border-red-600"
+    }">
+          <svg
+                  class="h-5 w-5 text-green-600 ${type === "success" ? "" : "hidden"}"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+          >
+              <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clip-rule="evenodd"
+              />
+          </svg>
+          <svg
+              class="h-5 w-5 text-red-600 ${type === "success" ? "hidden" : ""}"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+          >
+              <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clip-rule="evenodd"
+              />
+          </svg>
+      </div>
+      <div class="ml-2 py-2">
+          <p class="text-sm font-medium" class="tw-tooltip-message">${message}</p>
+      </div>
+      <div class="ml-auto pl-3 pr-2 py-3">
+          <div class="-mx-1.5 -my-1.5">
+              <button class="btn-tw-tooltip-dismiss" type="button" onclick="removeToastMessage(this)">
+                  <span class="sr-only">Dismiss</span>
+                  <svg
+                          class="h-4 w-4 font-bold text-gray-400 hover:text-gray-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                  >
+                      <path
+                              fill-rule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              clip-rule="evenodd"
+                      />
+                  </svg>
+              </button>
+          </div>
+      </div>
+  </div>`;
+
+    let $tooltipElement;
+
+    if (!noJquery) {
+        $twTooltipContainer.append(tooltipHtml);
+        $tooltipElement = $(".tw-tooltip-inner-container").eq("-1");
+        $tooltipElement.css("display", "flex");
+
+        // Start fading out after 75% of the time has passed
+        setTimeout(() => {
+            $tooltipElement.fadeOut(time * 0.25 * 1000, "swing");
+        }, time * 0.75 * 1000);
+
+    } else {
+        // emulating the same functionality as above for vanilla JS
+
+        $twTooltipContainer.innerHTML = tooltipHtml;
+        $tooltipElement = $twTooltipContainer.querySelector(".tw-tooltip-inner-container");
+        $tooltipElement.style.display = "flex";
+        $tooltipElement.style.opacity = '1';
+        $tooltipElement.style.transition = 'opacity ' + (time * 0.25) + 's ease-out';
+
+        setTimeout(function() {
+            $tooltipElement.style.opacity = '0';
+        }, time * 0.75 * 1000);
+
+    }
+
+    // Remove the element after the total time has passed
+    setTimeout(() => {
+        $tooltipElement.remove();
+    }, time * 1000);
+
+}
+
+function removeToastMessage(ele) {
+    if (noJquery) {
+        ele.closest(".tw-tooltip-inner-container").remove();
+    } else {
+        $(ele).closest(".tw-tooltip-inner-container").remove();
+    }
+}
+
+function isValidUrl(urlString) {
+    const urlPattern = new RegExp(
+        "^(https?:\\/\\/)?" + // validate protocol
+        "((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|" + // validate domain name
+        "((\\d{1,3}\\.){3}\\d{1,3}))" + // validate OR ip (v4) address
+        "(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*" + // validate port and path
+        "(\\?[;&a-z\\d%_.~+=-]*)?" + // validate query string
+        "(\\#[-a-z\\d_]*)?$",
+        "i"
+    ); // validate fragment locator
+    return !!urlPattern.test(urlString);
+}
+
+
+function checkValidityAndReturnError(ele, fieldLabel, bizEmails = null) {
+    const $ele = $(ele);
+    const val = $ele.val().trim();
+    const isRequired = $ele.attr("required");
+    const maxLengthAttributeValue = $ele.attr("maxLength");
+    const minLengthAttributeValue = $ele.attr("minLength");
+    const type = $ele.find("option").length ? "select" : $ele.attr("type");
+    let errorMsg = ``;
+    let isValid = true;
+    if (!isRequired && val === "") {
+    } else {
+        if (val === "" && isRequired) {
+            errorMsg = type === "select" ? `Please select any value.` : `Please provide the ${fieldLabel}.`;
+            isValid = false;
+        } else if (minLengthAttributeValue && val.length < minLengthAttributeValue) {
+            errorMsg = `Must be of ${maxLengthAttributeValue} atleast characters.`;
+            isValid = false;
+        } else if (maxLengthAttributeValue && val.length > maxLengthAttributeValue) {
+            errorMsg = `Must be no longer than ${maxLengthAttributeValue} characters.`;
+            isValid = false;
+        } else if ($ele.attr("data-validate")) {
+            const validationType = $ele.attr("data-validate");
+            switch (validationType) {
+                case "number":
+                    if (!/^(?:\+\d*)?(?:\(\d*\))?[0-9-]+$/.test(val) || val.length < 10) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid number with at least 10 digits and no white spaces allowed.`;
+                    }
+                    break;
+                case "url":
+                    try {
+                        let url = new URL(val);
+                        let validHostnameRegex = /^.+?\..{2,7}$/;
+                        if (!validHostnameRegex.test(url.host) || !/^https?:\/\//.test(val)) {
+                            throw new Error("URL host must be on form <host.com>");
+                        }
+                    } catch (error) {
+                        isValid = false;
+                        if (!/^https?:\/\//.test(val)) {
+                            errorMsg = `URL must start with 'http://' or 'https://'.`;
+                        } else {
+                            errorMsg = `Please provide a valid URL.`;
+                        }
+                    }
+                    break;
+                case "gst":
+                    if (!isValidGSTNo(val)) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid GST number.`;
+                    }
+                    break;
+                case "email":
+                    const emailRegex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+                    if (!emailRegex.test(val)) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid email.`;
+                    } else if (bizEmails) {
+                        const domain = val.includes("@") ? val.split("@")[1] : null;
+                        if (domain && bizEmails.includes(domain)) {
+                            isValid = false;
+                            errorMsg = `Must not be a personal Email ID.`;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    return {
+        valid: isValid,
+        errorMsg,
+    };
+}
+
+function checkValidityAndReturnErrorWithoutJQuery(ele, fieldLabel, bizEmails = null) {
+    const $ele = ele
+    const val = $ele.value.trim();
+    const isRequired = $ele.hasAttribute("required");
+    const maxLengthAttributeValue = $ele.getAttribute("maxLength");
+    const minLengthAttributeValue = $ele.getAttribute("minLength");
+    const type = $ele.querySelectorAll("option").length ? "select" : $ele.getAttribute("type");
+    let errorMsg = ``;
+    let isValid = true;
+
+    if (!isRequired && val === "") {
+    } else {
+        if (val === "" && isRequired) {
+            errorMsg = type === "select" ? `Please select any value.` : `Please provide the ${fieldLabel}.`;
+            isValid = false;
+        } else if (minLengthAttributeValue && val.length < minLengthAttributeValue) {
+            errorMsg = `Must be of ${maxLengthAttributeValue} atleast characters.`;
+            isValid = false;
+        } else if (maxLengthAttributeValue && val.length > maxLengthAttributeValue) {
+            errorMsg = `Must be no longer than ${maxLengthAttributeValue} characters.`;
+            isValid = false;
+        } else if ($ele.getAttribute("data-validate")) {
+            const validationType = $ele.getAttribute("data-validate");
+            switch (validationType) {
+                case "number":
+                    if (!/^(?:\+\d*)?(?:\(\d*\))?[0-9-]+$/.test(val) || val.length < 10) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid number with at least 10 digits and no white spaces allowed.`;
+                    }
+                    break;
+                case "url":
+                    try {
+                        let url = new URL(val);
+                        let validHostnameRegex = /^.+?\..{2,7}$/;
+                        if (!validHostnameRegex.test(url.host) || !/^https?:\/\//.test(val)) {
+                            throw new Error("URL host must be on form <host.com>");
+                        }
+                    } catch (error) {
+                        isValid = false;
+                        if (!/^https?:\/\//.test(val)) {
+                            errorMsg = `URL must start with 'http://' or 'https://'.`;
+                        } else {
+                            errorMsg = `Please provide a valid URL.`;
+                        }
+                    }
+                    break;
+                case "gst":
+                    if (!isValidGSTNo(val)) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid GST number.`;
+                    }
+                    break;
+                case "email":
+                    const emailRegex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+                    if (!emailRegex.test(val)) {
+                        isValid = false;
+                        errorMsg = `Please provide a valid email.`;
+                    } else if (bizEmails) {
+                        const domain = val.includes("@") ? val.split("@")[1] : null;
+                        if (domain && bizEmails.includes(domain)) {
+                            isValid = false;
+                            errorMsg = `Must not be a personal Email ID.`;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    return {
+        valid: isValid,
+        errorMsg,
+    };
+}
+
+function isValid(ele, fieldLabel) {
+    const $ele = $(ele);
+    const val = $ele.val().trim();
+    const isRequired = $ele.attr("required");
+    const maxLengthAttributeValue = $ele.attr("maxLength");
+    const minLengthAttributeValue = $ele.attr("minLength");
+    const type = $ele.find("option").length ? "select" : $ele.attr("type");
+    let errorMsg = ``;
+
+    if (!isRequired && val === "") {
+        return true;
+    }
+
+    if (val === "" && isRequired) {
+        showToast(
+            "error",
+            type === "select" ? `Please select any value for ${fieldLabel}.` : `${fieldLabel} can not be empty.`
+        );
+        return false;
+    } else if (minLengthAttributeValue && val.length < minLengthAttributeValue) {
+        showToast("error", `${fieldLabel} must be of ${maxLengthAttributeValue} characters.`);
+        return false;
+    } else if (maxLengthAttributeValue && val.length > maxLengthAttributeValue) {
+        showToast("error", `${fieldLabel} must be no longer than ${maxLengthAttributeValue} characters.`);
+        return false;
+    } else if ($ele.attr("data-validate")) {
+        let isValid = true;
+        if ($ele.attr("data-validate") === "number") {
+            if (!/^-?\d*?\d+$/.test(val)) {
+                isValid = false;
+            }
+        } else if ($(ele).attr("data-validate") === "url") {
+            // if (!isValidUrl(val)) {
+            //     isValid = false;
+            //     errorMsg = "It must have a period (.) and must have at least two characters in the domain name";
+            // }
+        } else if ($(ele).attr("data-validate") === "gst") {
+            if (!isValidGSTNo(val)) {
+                isValid = false;
+            }
+        } else if ($ele.attr("data-validate") === "email") {
+            const regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+            if (!regex.test(val)) {
+                isValid = false;
+            }
+        }
+
+        if (!isValid) {
+            showToast("error", `${fieldLabel} field value is not valid. ${errorMsg}`);
+            return false;
+        }
+    }
+    return true;
+}
+
+function isValidGSTNo(gstin) {
+    const result = {
+        isValid: false,
+        errorMsg: null,
+    };
+    if (gstin.length !== 15) {
+        result.errorMsg = "GSTIN should be exactly 15 characters long.";
+        return result;
+    }
+    const regex = new RegExp(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/);
+    if (regex.test(gstin) == false) {
+        result.errorMsg = "Invalid GSTIN.";
+        return result;
+    }
+    result.isValid = true;
+    return result;
+}
+
+function disableButtonsOnDemo(selectorString) {
+    $(selectorString).on("click", function () {
+        showToast("error", "This action is disabled on demo pages");
+        return false;
+    });
+}
+
+function debounce(func, wait, immediate) {
+    let timeout;
+    return function () {
+        const context = this,
+            args = arguments;
+        const later = function () {
+            timeout = null;
+            if (!immediate) func.apply(context, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
+    };
+}
+
+function updateQueryParams(args) {
+    Object.entries(args).forEach(([key, value]) => {
+        let searchParams = new URLSearchParams(window.location.search);
+        if (value) {
+            searchParams.set(key, value);
+        } else {
+            searchParams.delete(key);
+        }
+        var newRelativePathQuery =
+            window.location.pathname + `${searchParams.toString() ? "?" : ""}` + searchParams.toString();
+        history.pushState(null, "", newRelativePathQuery);
+    });
+}
+
+function getTestTypeTitleByType(type) {
+    if (type === "quiz") {
+        return "Quiz";
+    } else if (type === "programming") {
+        return "Programming";
+    } else if (type === "sql") {
+        return "SQL";
+    } else if (type === "css") {
+        return "CSS";
+    } else if (type === "video_interview") {
+        return "Video Response";
+    } else {
+        return type;
+    }
+}
+
+function isDomainEligible(domain) {
+    const disallowedEmailEndings = [".edu", ".ac.in", ".me"];
+    const disallowedSubstrings = [".edu.", "university"];
+    let isEligible = !disallowedEmailEndings.some((eduDomain) => domain.endsWith(eduDomain));
+    isEligible = isEligible && !disallowedSubstrings.some((substring) => domain.includes(substring));
+
+    if (
+        !isEligible &&
+        (getParamsVal("override_eligibility_check") === "1" ||
+            getParamsVal("next_url")?.includes("override_eligibility_check=1"))
+    ) {
+        isEligible = true;
+    }
+    return isEligible;
+}
+
+function checkBusinessEmail(ele, bizEmails) {
+    const email = $(ele).val().trim();
+    const domain = email.includes("@") ? email.split("@")[1] : null;
+    try {
+        if (domain && bizEmails.includes(domain)) {
+            return {
+                valid: false,
+                errorMsg: "Must not be a personal Email ID",
+            };
+        }
+        return {
+            valid: true,
+            errorMsg: null,
+        };
+    } catch (error) {
+        console.error("Error fetching business emails:", error);
+        return {
+            valid: false,
+            errorMsg: error,
+        };
+    }
+}
+
+function getTestsJson(filename) {
+    let json = null;
+    const RETRY_COUNT = 3;
+    for (let i = 0; i < RETRY_COUNT; i++) {
+        $.ajax({
+            async: false,
+            global: false,
+            url: "/static/tests-json/" + filename,
+            dataType: "json",
+            success: function (data) {
+                json = data;
+            },
+        });
+        if (json) {
+            break;
+        }
+    }
+    return json;
+}
+
+function eqpToast(message, type = "info", title, time = 7, primaryText = null, primaryHref = null, secondaryText = null, secondaryHref = null) {
+    const toastId = Date.now(); // Unique identifier for this toast
+    let progressColor = "";
+    if (type === "success") {
+        progressColor = "bg-green-600";
+    }
+    else if (type === "error") {
+        progressColor = "bg-red-600";
+    }
+    else if (type === "warning") {
+        progressColor = "bg-orange-600";
+    }
+    else if (type === "info") {
+        progressColor = "bg-blue-600";
+    }
+    else {
+        progressColor = "bg-blue-600";
+    }
+
+    const tooltipHtml = `
+        <div class="pointer-events-none inset-0 flex items-end  sm:items-start w-72 xs:w-96 tw-tooltip-inner-container eqp-toast-slide-in">
+            <div class="flex w-full flex-col items-center space-y-4 sm:items-end">
+                <div class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                    <div class="p-4">   
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                ${statusIcon(type, "p-1", size="w-4 h-4 stroke-2")}
+                            </div>
+                            <div class="ml-3 w-0 flex-1 pt-0.5">
+                                ${title ? `<p class="text-sm font-medium text-gray-900 mb-1 line-clamp-2">${title}</p>` : '' }
+                                ${ message ? `<p class="text-sm text-gray-500 line-clamp-3">${message}</p>` : ''}
+                                ${primaryHref || secondaryHref ?
+        `<div class="mt-3 flex space-x-3">
+                                        ${primaryHref ? `<a href="${primaryHref}" class="max-w-[50%] text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline hover:underline-offset-2 transition-all truncate" title="${primaryText}">${primaryText}</a>` : ''}
+                                        ${secondaryHref ? `<a href="${secondaryHref}" class="max-w-[50%] text-sm font-medium text-gray-600 hover:text-gray- hover:underline hover:underline-offset-2 transition-all truncate" title="${secondaryText}">${secondaryText}</a>` : ''}
+                                    </div>`
+        : ''}
+                            </div>
+                            <div class="ml-4 flex flex-shrink-0">
+                                <button type="button" onclick="removeToastMessage(this)" class="inline-flex rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none">
+                                    <span class="sr-only">Close</span>
+                                    <svg class="h-5 w-5 close" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    ${time > 0 ? `<div class="w-full h-1 bg-gray-100 eqp-toast-progress-${toastId}">
+                        <div class="h-full ${progressColor} progress"></div>
+                    </div>` : ''}
+                </div>
+            </div>
+        </div>`;
+
+
+    if (!noJquery) {
+        $twTooltipContainer.append(tooltipHtml);
+    }
+    else {
+        $twTooltipContainer.insertAdjacentHTML('beforeend', tooltipHtml);
+    }
+
+    const $tooltipElementAll = document.querySelectorAll('.tw-tooltip-inner-container')
+    const $tooltipElement = $tooltipElementAll[$tooltipElementAll.length - 1];
+    $tooltipElement.style.display = "flex";
+
+    if (time > 0) {
+        // Start progress (.eqp-toast-progress) from 100% to 0% in time
+        const progressDiv = document.querySelector(`.eqp-toast-progress-${toastId}`);
+        const progressBar = progressDiv.querySelector('.progress');
+
+        progressDiv.classList.add("active");
+
+        const timer1 = setTimeout(() => {
+        }, time * 1000 + 300); // Add some extra milliseconds for smooth transition
+
+        let progressPercentage = 100;
+        const intervalDuration = 10; // in milliseconds for smoother animation
+        const totalSteps = time * 1000 / intervalDuration;
+        const step = 100 / totalSteps;
+
+        const progressInterval = setInterval(() => {
+            progressPercentage -= step;
+            progressBar.style.width = `${progressPercentage}%`;
+
+            // Slide out the toast when progress reaches 5%
+            if (progressPercentage <= 5) {
+                $tooltipElement.classList.remove("eqp-toast-slide-in");
+                $tooltipElement.classList.add("eqp-toast-slide-out");
+            }
+
+            // Clear interval when progress reaches 0%
+            if (progressPercentage <= 0) {
+                clearInterval(progressInterval);
+                clearTimeout(timer1);
+                progressDiv.classList.remove("active");
+                $tooltipElement.remove();
+            }
+        }, intervalDuration);
+    }
+}
+
+function showDatePicker(id, dateOnly=false, timeOnly=false, options) {
+    const dateTimeInputCTR = document.getElementById(id);
+    if (timeOnly !== 'true') { // this should change to boolean in actual usage
+        const dateInput = document.createElement("input");
+        dateInput.type = "date";
+        dateInput.classList.add("date-input", "lg:ml-4", "w-max", "border", "border-gray-300", "rounded-md", "py-1.5", "px-4");
+        if (options && options.disallowPastDates) {
+            dateInput.min = new Date().toISOString().split('T')[0];
+        }
+        if (options && options.disallowFutureDates) {
+            dateInput.max = new Date().toISOString().split('T')[0];
+        }
+        if (options && options.initialIsoDateTime) {
+            const dateObj = new Date(options.initialIsoDateTime);
+            console.log("dateObj", dateObj)
+            dateInput.value = dateObj.toISOString().split('T')[0];
+        }
+
+        dateTimeInputCTR.appendChild(dateInput);
+    }
+    if (dateOnly !== 'true') { // this should change to boolean in actual usage
+        const timeInput = document.createElement("input");
+        timeInput.type = "time";
+        timeInput.classList.add("ml-4", "w-max", "border", "border-gray-300", "rounded-md", "py-1.5", "px-4");
+        setDisablePastOrFuttureTime(timeInput, options?.disallowPastTimes, options?.disallowFutureTimes);
+        if (options && options.initialIsoDateTime) {
+            const dateObj = new Date(options.initialIsoDateTime);
+            timeInput.value = dateObj.toISOString().split('T')[1].split('.')[0];
+        }
+        dateTimeInputCTR.appendChild(timeInput);
+    }
+
+    // below lines will be removed in actual usage
+    const secBtn =  document.querySelector(`#${id}~button.sec-btn`)
+    secBtn.classList.remove("hidden");
+    secBtn.onclick = function() {
+        showDateTimeDetails(id, dateOnly, timeOnly);
+    }
+    document.querySelector(`#${id}~button.pri-btn`).classList.add("hidden");
+
+}
+
+function showDateTimeDetails (id) {
+    const dateInput = document.querySelector(`#${id}>input[type="date"]`);
+    const timeInput = document.querySelector(`#${id}>input[type="time"]`);
+
+    const currentDateTime = new Date().toISOString().slice(0, 19)
+
+    let selectedDateTime;
+    if (dateOnly !== 'true' && timeOnly !== 'true') {
+        if(!dateInput.value || !timeInput.value){
+            alert("Please select a date.");
+            return;
+        }
+        selectedDateTime = (dateInput?.value && timeInput?.value) ? new Date(`${dateInput.value}T${timeInput.value}`).toISOString().slice(0, 19) : dateInput.value ? dateInput.value + 'T00:00:00' : '0000-00-00T' + timeInput.value;
+    } else if (dateOnly == 'true') {
+        if(!dateInput.value){
+            alert("Please select a date.");
+            return;
+        }
+        selectedDateTime = dateInput.value + 'T00:00:00';
+    } else if (timeOnly == 'true') {
+        if(!timeInput.value){
+            alert("Please select a time.");
+            return;
+        }
+        let timeOnlyDateObj = new Date();
+        timeOnlyDateObj.setHours(timeInput.value.split(':')[0]);
+        timeOnlyDateObj.setMinutes(timeInput.value.split(':')[1]);
+        selectedDateTime = timeOnlyDateObj.toISOString().slice(0, 19)
+    }
+
+    const unixTimeDifference = Math.abs(Date.parse(currentDateTime) - Date.parse(selectedDateTime));
+    const timeDifference = convertMillisecondsToDigitalClockFormat(unixTimeDifference);
+
+    eqpSwal.fire({
+        html: `
+            <div class="flex flex-col gap-3">
+                <div>
+                    <span class="font-bold">Current Date and Time:</span>
+                    <span>${currentDateTime}</span>
+                </div>
+                <div>
+                    <span class="font-bold">Selected Date and Time:</span>
+                    <span>${selectedDateTime}</span>
+                </div>
+                <div>
+                    <span class="font-bold">Difference:</span>
+                    <span>${timeDifference}</span>
+                </div>
+            </div>
+        `,
+
+    })
+        .then(() => {
+            const dateTimeInputCTR = document.getElementById(id);
+            if(dateOnly !== 'true' && timeOnly !== 'true'){
+                dateTimeInputCTR.removeChild(dateInput);
+                dateTimeInputCTR.removeChild(timeInput);
+            } else if (dateOnly == 'true') {
+                dateTimeInputCTR.removeChild(dateInput);
+            } else if (timeOnly == 'true') {
+                dateTimeInputCTR.removeChild(timeInput);
+            }
+            const secBtn =  document.querySelector(`#${id}~button.sec-btn`)
+            secBtn.classList.add("hidden");
+            document.querySelector(`#${id}~button.pri-btn`).classList.remove("hidden");
+        })
+}
+
+function convertMillisecondsToDigitalClockFormat(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    return `${days} days, ${hours % 24} hours, ${minutes % 60} minutes, ${seconds % 60} seconds`;
+}
+
+function setDisablePastOrFuttureTime (timeInput, disablePast, disableFuture) {
+
+    // Get current time
+    const currentTime = new Date();
+    const currentHours = currentTime.getHours();
+    const currentMinutes = currentTime.getMinutes();
+
+    timeInput.addEventListener('input', function() {
+        const selectedTime = this.value.split(':');
+        const selectedHours = parseInt(selectedTime[0]);
+        const selectedMinutes = parseInt(selectedTime[1]);
+
+        if (disablePast) {
+            if (selectedHours < currentHours || (selectedHours === currentHours && selectedMinutes < currentMinutes)) {
+                alert("Please select a time in the future.");
+                timeInput.value = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+            }
+        } else if (disableFuture) {
+            if (selectedHours > currentHours || (selectedHours === currentHours && selectedMinutes > currentMinutes)) {
+                alert("Please select a time in the past.");
+                timeInput.value = `${currentHours.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+            }
+        }
+    });
+
+}
+
+
+// function that checks if the domain is valid (if the domain loads on the browser). If it does, it returns true, else false.
+async function validateDomain(domain){
+  // Dynamic whitelist from S3
+  const whitelistRes = await fetch(
+    "https://soc-media-assets.s3.amazonaws.com/equip/product/data/whitelisted-domains.csv"
+  );
+  const whitelistData = await whitelistRes.text();
+  if (whitelistData.includes(domain)) {
+    return true;
+  }
+  const response = await fetch(
+    "https://drruxdbiup24mr533vrbuw6kmy0kyzxq.lambda-url.us-east-1.on.aws/isDomainValid?url=https://" +
+      domain
+  );
+  const result = await response.json();
+  return result.isValid;
+}
+const uploadImageCallBack = async (localSrc) => {
+    try {
+        const data = await $.get(`/api/get-object-put-url/?path=user-pics`).then((data) => {
+            return data;
+        });
+        const response = await fetch(localSrc).then((r) => r.blob());
+        const xhr = new XMLHttpRequest();
+        let imagedUploaded = "idle";
+        xhr.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                imagedUploaded = "success";
+            } else if (this.readyState == 4) {
+                imagedUploaded = "error";
+            }
+        };
+        xhr.open("PUT", `${data.put_url}`);
+        xhr.setRequestHeader("Content-Type", response.type);
+        xhr.setRequestHeader("x-amz-acl", "public-read");
+        xhr.send(response);
+        let timeout;
+        return new Promise((resolve, reject) => {
+            timeout = setTimeout(() => {
+                showToast('error', 'Failed to upload the image');
+                resolve({ data: { link: null } });
+            }, 15 * 1000);
+            const interval = setInterval(async () => {
+                if (imagedUploaded === "success") {
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                    resolve({ data: { link: data.url } });
+                } else if (imagedUploaded === "error") {
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                    showToast('error', 'Failed to upload the image');
+                    resolve({ data: { link: null } });
+                }
+            }, 50);
+        });
+    } catch (error) {
+        return new Promise((resolve, reject) => {
+            reject(error);
+        });
+    }
+
+};
+
+function handleProfilePictureUpload(e) {
+    // handle image size
+    const fileData = e.target.files[0];
+    const allowedFilesTypeSize = { type: ["jpeg", "jpg", "png", "webp", "svg+xml"], size: 2000000 };
+    if (!allowedFilesTypeSize.type.some((type) => fileData.type.indexOf(type) >= 0)) {
+        eqpToast(`Invalid file type uploaded. Please upload png, jpeg, jpg or svg only`, "error");
+        return false;
+    } else if (fileData.size > allowedFilesTypeSize.size) {
+        eqpToast(`Size of thumbnail can't be greater than 2 MB`, "error");
+        return false;
+    }
+    const fileInput = e.target;
+    const file = fileInput.files[0];
+    if (file === undefined) return;
+
+    newProfilePicture = URL.createObjectURL(file);
+    document.getElementById('profile-picture').src = newProfilePicture;
+}
+
+async function updateProfileData(publicEmailProvider) {
+    const profileUpdateBtn = document.getElementById("btn-profile-submit");
+    profileUpdateBtn.disabled = true;
+    profileUpdateBtn.textContent = "Updating..."
+    const url = window.location;
+    let profileDetails = {};
+    let hasError = false;
+    $(".eqp-validate").each(function () {
+        const fieldLabel = $(this).attr('data-field-label');
+        let validation =
+            checkValidityAndReturnError(
+                $(this),
+                fieldLabel,
+                fieldLabel === 'Email'? publicEmailProvider : null //optional field only passed for business email validation
+            )
+
+        if (validation.valid) {
+            const id = $(this).attr('id');
+            const val = $(this).val();
+            profileDetails[id] =  val;
+        } else {
+            hasError = true;
+            $(this).next().remove();
+            $(this).after(`<span class="text-red-500 text-sm">${validation.errorMsg}</span>`)
+            profileUpdateBtn.disabled = false;
+            profileUpdateBtn.textContent = "Update"
+        }
+    });
+
+    if (!hasError) {
+        if (newProfilePicture !== null) {
+            try {
+                let { data } = await uploadImageCallBack(newProfilePicture);
+                if (data.link !== null) {
+                    profileDetails['profile_pic'] = data.link;
+                } else {
+                    // throw an error if image upload fails
+                    // to send control to the catch block
+                    throw new Error("Failed to upload image");
+                }
+            } catch (error) {
+                // Handle the error, e.g., show an error message to the user
+                console.log("Failed to upload image", error);
+                profileUpdateBtn.disabled = false; // Re-enable button in case of error during image upload
+                profileUpdateBtn.textContent = "Update"
+                return; // Exit the function early due to error
+            }
+        }
+
+        const callbackOptions = {
+            successRedirect: url
+        };
+        makePostRequest(url, profileDetails, callbackOptions);
+    }
+}
+
+// to show and hide body on clicking chevron down and up and show and hide the chevron icons accordingly
+
+function showDocumentation(){
+    const $documentationBody = document.getElementById("documentation-body");
+    const $chevronDown = document.getElementById("chevron-down");
+    const $chevronUp = document.getElementById("chevron-up");
+
+    $documentationBody.classList.remove("hidden");
+    $chevronDown.classList.add("hidden");
+    $chevronUp.classList.remove("hidden");
+}
+
+function hideDocumentation(){
+
+    const $documentationBody = document.getElementById("documentation-body");
+    const $chevronDown = document.getElementById("chevron-down");
+    const $chevronUp = document.getElementById("chevron-up");
+
+    $documentationBody.classList.add("hidden");
+    $chevronDown.classList.remove("hidden");
+    $chevronUp.classList.add("hidden");
+}
